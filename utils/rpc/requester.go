@@ -13,14 +13,8 @@ import (
 	rpc "github.com/gorilla/rpc/v2/json2"
 )
 
-// ============= RPC Requester ===================
-const (
-	defaultMinID = 1
-	defaultMaxID = 1000000
-)
-
-// RPCRequester ...
-type RPCRequester interface {
+// Requester ...
+type Requester interface {
 	SendJSONRPCRequest(endpoint string, method string, params interface{}, reply interface{}) error
 }
 
@@ -30,7 +24,7 @@ type jsonRPCRequester struct {
 }
 
 // NewRPCRequester ...
-func NewRPCRequester(uri string, requestTimeout time.Duration) RPCRequester {
+func NewRPCRequester(uri string, requestTimeout time.Duration) Requester {
 	return &jsonRPCRequester{
 		uri: uri,
 		client: http.Client{
@@ -72,7 +66,7 @@ type EndpointRequester interface {
 }
 
 type avalancheEndpointRequester struct {
-	requester      RPCRequester
+	requester      Requester
 	endpoint, base string
 }
 
