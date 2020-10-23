@@ -690,7 +690,7 @@ func TestCreateFixedCapAsset(t *testing.T) {
 	}
 	_, fromAddrsStr := sampleAddrs(t, vm, addrs)
 
-	err = s.CreateFixedCapAsset(nil, &CreateFixedCapAssetArgs{
+	err = s.CreateFixedCapAsset(nil, &CreateAssetArgs{
 		JSONSpendHeader: api.JSONSpendHeader{
 			UserPass: api.UserPass{
 				Username: username,
@@ -734,7 +734,7 @@ func TestCreateVariableCapAsset(t *testing.T) {
 	}
 	_, fromAddrsStr := sampleAddrs(t, vm, addrs)
 
-	err = s.CreateVariableCapAsset(nil, &CreateVariableCapAssetArgs{
+	err = s.CreateVariableCapAsset(nil, &CreateAssetArgs{
 		JSONSpendHeader: api.JSONSpendHeader{
 			UserPass: api.UserPass{
 				Username: username,

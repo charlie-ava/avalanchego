@@ -36,7 +36,6 @@ const (
 var (
 	errUnknownAssetID         = errors.New("unknown asset ID")
 	errTxNotCreateAsset       = errors.New("transaction doesn't create an asset")
-	errNoHolders              = errors.New("initialHolders must not be empty")
 	errNoMinters              = errors.New("no minters provided")
 	errNoHoldersOrMinters     = errors.New("no minters or initialHolders provided")
 	errInvalidAmount          = errors.New("amount must be positive")
