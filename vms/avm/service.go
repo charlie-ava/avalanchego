@@ -38,6 +38,7 @@ var (
 	errTxNotCreateAsset       = errors.New("transaction doesn't create an asset")
 	errNoHolders              = errors.New("initialHolders must not be empty")
 	errNoMinters              = errors.New("no minters provided")
+	errNoHoldersOrMinters     = errors.New("no minters or initialHolders provided")
 	errInvalidAmount          = errors.New("amount must be positive")
 	errNoOutputs              = errors.New("no outputs to send")
 	errSpendOverflow          = errors.New("spent amount overflows uint64")
@@ -428,19 +429,26 @@ func (service *Service) GetAllBalances(r *http.Request, args *api.JSONAddress, r
 	return nil
 }
 
-// CreateFixedCapAssetArgs are arguments for passing into CreateFixedCapAsset requests
-type CreateFixedCapAssetArgs struct {
+// Holder describes how much an address owns of an asset
+type Holder struct {
+	Amount  json.Uint64 `json:"amount"`
+	Address string      `json:"address"`
+}
+
+// Owners describes who can perform an action
+type Owners struct {
+	Threshold json.Uint32 `json:"threshold"`
+	Minters   []string    `json:"minters"`
+}
+
+// CreateAssetArgs are arguments for passing into CreateAsset
+type CreateAssetArgs struct {
 	api.JSONSpendHeader           // User, password, from addrs, change addr
 	Name                string    `json:"name"`
 	Symbol              string    `json:"symbol"`
 	Denomination        byte      `json:"denomination"`
 	InitialHolders      []*Holder `json:"initialHolders"`
-}
-
-// Holder describes how much an address owns of an asset
-type Holder struct {
-	Amount  json.Uint64 `json:"amount"`
-	Address string      `json:"address"`
+	MinterSets          []Owners  `json:"minterSets"`
 }
 
 // AssetIDChangeAddr is an asset ID and a change address
@@ -449,16 +457,17 @@ type AssetIDChangeAddr struct {
 	api.JSONChangeAddr
 }
 
-// CreateFixedCapAsset returns ID of the newly created asset
-func (service *Service) CreateFixedCapAsset(r *http.Request, args *CreateFixedCapAssetArgs, reply *AssetIDChangeAddr) error {
-	service.vm.ctx.Log.Info("AVM: CreateFixedCapAsset called with name: %s symbol: %s number of holders: %d",
+// CreateAsset returns ID of the newly created asset
+func (service *Service) CreateAsset(r *http.Request, args *CreateAssetArgs, reply *AssetIDChangeAddr) error {
+	service.vm.ctx.Log.Info("AVM: CreateAsset called with name: %s symbol: %s number of holders: %d number of minters: %d",
 		args.Name,
 		args.Symbol,
 		len(args.InitialHolders),
+		len(args.MinterSets),
 	)
 
-	if len(args.InitialHolders) == 0 {
-		return errNoHolders
+	if len(args.InitialHolders) == 0 && len(args.MinterSets) == 0 {
+		return errNoHoldersOrMinters
 	}
 
 	// Parse the from addresses
@@ -515,7 +524,7 @@ func (service *Service) CreateFixedCapAsset(r *http.Request, args *CreateFixedCa
 
 	initialState := &InitialState{
 		FxID: 0, // TODO: Should lookup secp256k1fx FxID
-		Outs: make([]verify.State, 0, len(args.InitialHolders)),
+		Outs: make([]verify.State, 0, len(args.InitialHolders)+len(args.MinterSets)),
 	}
 	for _, holder := range args.InitialHolders {
 		addr, err := service.vm.ParseLocalAddress(holder.Address)
@@ -529,117 +538,6 @@ func (service *Service) CreateFixedCapAsset(r *http.Request, args *CreateFixedCa
 				Addrs:     []ids.ShortID{addr},
 			},
 		})
-	}
-	initialState.Sort(service.vm.codec)
-
-	tx := Tx{UnsignedTx: &CreateAssetTx{
-		BaseTx: BaseTx{BaseTx: avax.BaseTx{
-			NetworkID:    service.vm.ctx.NetworkID,
-			BlockchainID: service.vm.ctx.ChainID,
-			Outs:         outs,
-			Ins:          ins,
-		}},
-		Name:         args.Name,
-		Symbol:       args.Symbol,
-		Denomination: args.Denomination,
-		States:       []*InitialState{initialState},
-	}}
-	if err := tx.SignSECP256K1Fx(service.vm.codec, keys); err != nil {
-		return err
-	}
-
-	assetID, err := service.vm.IssueTx(tx.Bytes())
-	if err != nil {
-		return fmt.Errorf("problem issuing transaction: %w", err)
-	}
-
-	reply.AssetID = assetID
-	reply.ChangeAddr, err = service.vm.FormatLocalAddress(changeAddr)
-	return err
-}
-
-// CreateVariableCapAssetArgs are arguments for passing into CreateVariableCapAsset requests
-type CreateVariableCapAssetArgs struct {
-	api.JSONSpendHeader          // User, password, from addrs, change addr
-	Name                string   `json:"name"`
-	Symbol              string   `json:"symbol"`
-	Denomination        byte     `json:"denomination"`
-	MinterSets          []Owners `json:"minterSets"`
-}
-
-// Owners describes who can perform an action
-type Owners struct {
-	Threshold json.Uint32 `json:"threshold"`
-	Minters   []string    `json:"minters"`
-}
-
-// CreateVariableCapAsset returns ID of the newly created asset
-func (service *Service) CreateVariableCapAsset(r *http.Request, args *CreateVariableCapAssetArgs, reply *AssetIDChangeAddr) error {
-	service.vm.ctx.Log.Info("AVM: CreateVariableCapAsset called with name: %s symbol: %s number of minters: %d",
-		args.Name,
-		args.Symbol,
-		len(args.MinterSets),
-	)
-
-	if len(args.MinterSets) == 0 {
-		return errNoMinters
-	}
-
-	// Parse the from addresses
-	fromAddrs := ids.ShortSet{}
-	for _, addrStr := range args.From {
-		addr, err := service.vm.ParseLocalAddress(addrStr)
-		if err != nil {
-			return fmt.Errorf("couldn't parse 'from' address %s: %w", addrStr, err)
-		}
-		fromAddrs.Add(addr)
-	}
-
-	// Get the UTXOs/keys for the from addresses
-	utxos, kc, err := service.vm.LoadUser(args.Username, args.Password, fromAddrs)
-	if err != nil {
-		return err
-	}
-
-	// Parse the change address.
-	if len(kc.Keys) == 0 {
-		return errNoKeys
-	}
-	changeAddr, err := service.vm.selectChangeAddr(kc.Keys[0].PublicKey().Address(), args.ChangeAddr)
-	if err != nil {
-		return err
-	}
-
-	avaxKey := service.vm.ctx.AVAXAssetID.Key()
-	amountsSpent, ins, keys, err := service.vm.Spend(
-		utxos,
-		kc,
-		map[[32]byte]uint64{
-			avaxKey: service.vm.creationTxFee,
-		},
-	)
-	if err != nil {
-		return err
-	}
-
-	outs := []*avax.TransferableOutput{}
-	if amountSpent := amountsSpent[avaxKey]; amountSpent > service.vm.creationTxFee {
-		outs = append(outs, &avax.TransferableOutput{
-			Asset: avax.Asset{ID: service.vm.ctx.AVAXAssetID},
-			Out: &secp256k1fx.TransferOutput{
-				Amt: amountSpent - service.vm.creationTxFee,
-				OutputOwners: secp256k1fx.OutputOwners{
-					Locktime:  0,
-					Threshold: 1,
-					Addrs:     []ids.ShortID{changeAddr},
-				},
-			},
-		})
-	}
-
-	initialState := &InitialState{
-		FxID: 0, // TODO: Should lookup secp256k1fx FxID
-		Outs: make([]verify.State, 0, len(args.MinterSets)),
 	}
 	for _, owner := range args.MinterSets {
 		minter := &secp256k1fx.MintOutput{
@@ -684,6 +582,28 @@ func (service *Service) CreateVariableCapAsset(r *http.Request, args *CreateVari
 	reply.AssetID = assetID
 	reply.ChangeAddr, err = service.vm.FormatLocalAddress(changeAddr)
 	return err
+}
+
+// CreateFixedCapAsset returns ID of the newly created asset
+func (service *Service) CreateFixedCapAsset(r *http.Request, args *CreateAssetArgs, reply *AssetIDChangeAddr) error {
+	service.vm.ctx.Log.Info("AVM: CreateFixedCapAsset called with name: %s symbol: %s number of holders: %d",
+		args.Name,
+		args.Symbol,
+		len(args.InitialHolders),
+	)
+
+	return service.CreateAsset(nil, args, reply)
+}
+
+// CreateVariableCapAsset returns ID of the newly created asset
+func (service *Service) CreateVariableCapAsset(r *http.Request, args *CreateAssetArgs, reply *AssetIDChangeAddr) error {
+	service.vm.ctx.Log.Info("AVM: CreateVariableCapAsset called with name: %s symbol: %s number of minters: %d",
+		args.Name,
+		args.Symbol,
+		len(args.MinterSets),
+	)
+
+	return service.CreateAsset(nil, args, reply)
 }
 
 // CreateNFTAssetArgs are arguments for passing into CreateNFTAsset requests
