@@ -15,6 +15,10 @@ import (
 	"github.com/ava-labs/avalanchego/utils/rpc"
 )
 
+// TODO: add all possible parameters to each API call in avm and platformvm clients
+// they are not currently fully featured
+// TODO provide comments on all avm client API calls
+
 // Client ...
 type Client struct {
 	requester rpc.EndpointRequester
