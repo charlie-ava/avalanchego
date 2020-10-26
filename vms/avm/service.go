@@ -1608,8 +1608,9 @@ type ExportAVAXArgs struct {
 	To string `json:"to"`
 }
 
-// ExportAVAX sends AVAX from this chain to the P-Chain.
-// After this tx is accepted, the AVAX must be imported to the P-chain with an importTx.
+// ExportAVAX sends AVAX from this chain to the address specified by [to].
+// [to] specifies which chain to export funds to.
+// After this tx is accepted, the AVAX must be imported to the P/C chain with an importTx.
 // Returns the ID of the newly created atomic transaction
 func (service *Service) ExportAVAX(_ *http.Request, args *ExportAVAXArgs, reply *api.JSONTxIDChangeAddr) error {
 	return service.Export(nil, &ExportArgs{

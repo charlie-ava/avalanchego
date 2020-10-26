@@ -15,10 +15,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/rpc"
 )
 
-// TODO: add all possible parameters to each API call in avm and platformvm clients
-// they are not currently fully featured
-// TODO provide comments on all avm client API calls
-
 // Client ...
 type Client struct {
 	requester rpc.EndpointRequester
@@ -38,23 +34,19 @@ func (c *Client) IssueTx(txBytes []byte) (ids.ID, error) {
 		Tx:       formatting.Hex{Bytes: txBytes}.String(),
 		Encoding: formatting.HexEncoding,
 	}, res)
-	if err != nil {
-		return ids.Empty, err
-	}
-	return res.TxID, nil
+	return res.TxID, err
 }
 
+// GetTxStatus returns the status of [txID]
 func (c *Client) GetTxStatus(txID ids.ID) (choices.Status, error) {
 	res := &GetTxStatusReply{}
 	err := c.requester.SendRequest("getTxStatus", &api.JSONTxID{
 		TxID: txID,
 	}, res)
-	if err != nil {
-		return choices.Unknown, err
-	}
-	return res.Status, nil
+	return res.Status, err
 }
 
+// GetTx returns the byte representation of [txID]
 func (c *Client) GetTx(txID ids.ID) ([]byte, error) {
 	res := &api.FormattedTx{}
 	err := c.requester.SendRequest("getTx", &api.GetTxArgs{
@@ -99,6 +91,7 @@ func (c *Client) GetUTXOs(addrs []string, limit uint32, startAddress, startUTXOI
 	return utxos, res.EndIndex, nil
 }
 
+// GetAssetDescription returns a description of [assetID]
 func (c *Client) GetAssetDescription(assetID string) (*GetAssetDescriptionReply, error) {
 	res := &GetAssetDescriptionReply{}
 	err := c.requester.SendRequest("getAssetDescription", &GetAssetDescriptionArgs{
@@ -107,6 +100,7 @@ func (c *Client) GetAssetDescription(assetID string) (*GetAssetDescriptionReply,
 	return res, err
 }
 
+// GetBalance returns the balance for [addr] of [assetID]
 func (c *Client) GetBalance(addr string, assetID string) (*GetBalanceReply, error) {
 	res := &GetBalanceReply{}
 	err := c.requester.SendRequest("getBalance", &GetBalanceArgs{
@@ -116,7 +110,8 @@ func (c *Client) GetBalance(addr string, assetID string) (*GetBalanceReply, erro
 	return res, err
 }
 
-func (c *Client) GetAllBalances(addr string, assetID string) (*GetAllBalancesReply, error) {
+// GetAllBalances returns all asset balances for [addr]
+func (c *Client) GetAllBalances(addr string) (*GetAllBalancesReply, error) {
 	res := &GetAllBalancesReply{}
 	err := c.requester.SendRequest("getAllBalances", &api.JSONAddress{
 		Address: addr,
@@ -124,6 +119,34 @@ func (c *Client) GetAllBalances(addr string, assetID string) (*GetAllBalancesRep
 	return res, err
 }
 
+// CreateAsset creates a new asset and returns its assetID
+func (c *Client) CreateAsset(
+	user api.UserPass,
+	name,
+	symbol string,
+	denomination byte,
+	holders []*Holder,
+	minters []Owners,
+	from []string,
+	changeAddr string,
+) (ids.ID, error) {
+	res := &FormattedAssetID{}
+	err := c.requester.SendRequest("createAsset", &CreateAssetArgs{
+		JSONSpendHeader: api.JSONSpendHeader{
+			UserPass:       user,
+			JSONFromAddrs:  api.JSONFromAddrs{From: from},
+			JSONChangeAddr: api.JSONChangeAddr{ChangeAddr: changeAddr},
+		},
+		Name:           name,
+		Symbol:         symbol,
+		Denomination:   denomination,
+		InitialHolders: holders,
+		MinterSets:     minters,
+	}, res)
+	return res.AssetID, err
+}
+
+// CreateFixedCapAsset creates a new fixed cap asset and returns its assetID
 func (c *Client) CreateFixedCapAsset(
 	user api.UserPass,
 	name,
@@ -145,12 +168,10 @@ func (c *Client) CreateFixedCapAsset(
 		Denomination:   denomination,
 		InitialHolders: holders,
 	}, res)
-	if err != nil {
-		return ids.Empty, err
-	}
-	return res.AssetID, nil
+	return res.AssetID, err
 }
 
+// CreateVariableCapAsset creates a new variable cap asset and returns its assetID
 func (c *Client) CreateVariableCapAsset(
 	user api.UserPass,
 	name,
@@ -172,12 +193,10 @@ func (c *Client) CreateVariableCapAsset(
 		Denomination: denomination,
 		MinterSets:   minters,
 	}, res)
-	if err != nil {
-		return ids.Empty, err
-	}
-	return res.AssetID, nil
+	return res.AssetID, err
 }
 
+// CreateNFTAsset creates a new NFT asset and returns its assetID
 func (c *Client) CreateNFTAsset(
 	user api.UserPass,
 	name,
@@ -197,59 +216,50 @@ func (c *Client) CreateNFTAsset(
 		Symbol:     symbol,
 		MinterSets: minters,
 	}, res)
-	if err != nil {
-		return ids.Empty, err
-	}
-	return res.AssetID, nil
+	return res.AssetID, err
 }
 
+// CreateAddress creates a new address controlled by [user]
 func (c *Client) CreateAddress(user api.UserPass) (string, error) {
 	res := &api.JSONAddress{}
 	err := c.requester.SendRequest("createAddress", &user, res)
-	if err != nil {
-		return "", err
-	}
-	return res.Address, nil
+	return res.Address, err
 }
 
+// ListAddresses returns all addresses on this chain controlled by [user]
 func (c *Client) ListAddresses(user api.UserPass) ([]string, error) {
 	res := &api.JSONAddresses{}
 	err := c.requester.SendRequest("listAddresses", &user, res)
-	if err != nil {
-		return nil, err
-	}
-	return res.Addresses, nil
+	return res.Addresses, err
 }
 
+// ExportKey returns the private key corresponding to [addr] controlled by [user]
 func (c *Client) ExportKey(user api.UserPass, addr string) (string, error) {
 	res := &ExportKeyReply{}
 	err := c.requester.SendRequest("exportKey", &ExportKeyArgs{
 		UserPass: user,
 		Address:  addr,
 	}, res)
-	if err != nil {
-		return "", err
-	}
-	return res.PrivateKey, nil
+	return res.PrivateKey, err
 }
 
+// ImportKey imports [privateKey] to [user]
 func (c *Client) ImportKey(user api.UserPass, privateKey string) (string, error) {
 	res := &api.JSONAddress{}
 	err := c.requester.SendRequest("importKey", &ImportKeyArgs{
 		UserPass:   user,
 		PrivateKey: privateKey,
 	}, res)
-	if err != nil {
-		return "", err
-	}
-	return res.Address, nil
+	return res.Address, err
 }
 
+// Send [amount] of [assetID] to address [to]
 func (c *Client) Send(
 	user api.UserPass,
 	amount uint64,
 	assetID,
-	to string,
+	to,
+	memo string,
 	from []string,
 	changeAddr string,
 ) (ids.ID, error) {
@@ -265,16 +275,16 @@ func (c *Client) Send(
 			AssetID: assetID,
 			To:      to,
 		},
+		Memo: memo,
 	}, res)
-	if err != nil {
-		return ids.Empty, err
-	}
-	return res.TxID, nil
+	return res.TxID, err
 }
 
+// SendMultiple sends a transaction from [user] funding all [outputs]
 func (c *Client) SendMultiple(
 	user api.UserPass,
 	outputs []SendOutput,
+	memo string,
 	from []string,
 	changeAddr string,
 ) (ids.ID, error) {
@@ -286,13 +296,12 @@ func (c *Client) SendMultiple(
 			JSONChangeAddr: api.JSONChangeAddr{ChangeAddr: changeAddr},
 		},
 		Outputs: outputs,
+		Memo:    memo,
 	}, res)
-	if err != nil {
-		return ids.Empty, err
-	}
-	return res.TxID, nil
+	return res.TxID, err
 }
 
+// Mint [amount] of [assetID] to be owned by [to]
 func (c *Client) Mint(
 	user api.UserPass,
 	amount uint64,
@@ -312,12 +321,10 @@ func (c *Client) Mint(
 		AssetID: assetID,
 		To:      to,
 	}, res)
-	if err != nil {
-		return ids.Empty, err
-	}
-	return res.TxID, nil
+	return res.TxID, err
 }
 
+// SendNFT sends an NFT and returns the ID of the newly created transaction
 func (c *Client) SendNFT(
 	user api.UserPass,
 	assetID string,
@@ -337,12 +344,10 @@ func (c *Client) SendNFT(
 		GroupID: cjson.Uint32(groupID),
 		To:      to,
 	}, res)
-	if err != nil {
-		return ids.Empty, err
-	}
-	return res.TxID, nil
+	return res.TxID, err
 }
 
+// MintNFT issues a MintNFT transaction and returns the ID of the newly created transaction
 func (c *Client) MintNFT(
 	user api.UserPass,
 	assetID string,
@@ -363,12 +368,12 @@ func (c *Client) MintNFT(
 		Encoding: formatting.HexEncoding,
 		To:       to,
 	}, res)
-	if err != nil {
-		return ids.Empty, err
-	}
-	return res.TxID, nil
+	return res.TxID, err
 }
 
+// ImportAVAX sends an import transaction to import funds from [sourceChain] and
+// returns the ID of the newly created transaction
+// This is a deprecated name for Import
 func (c *Client) ImportAVAX(user api.UserPass, to, sourceChain string) (ids.ID, error) {
 	res := &api.JSONTxID{}
 	err := c.requester.SendRequest("importAVAX", &ImportArgs{
@@ -376,12 +381,23 @@ func (c *Client) ImportAVAX(user api.UserPass, to, sourceChain string) (ids.ID, 
 		To:          to,
 		SourceChain: sourceChain,
 	}, res)
-	if err != nil {
-		return ids.Empty, err
-	}
-	return res.TxID, nil
+	return res.TxID, err
 }
 
+// Import sends an import transaction to import funds from [sourceChain] and
+// returns the ID of the newly created transaction
+func (c *Client) Import(user api.UserPass, to, sourceChain string) (ids.ID, error) {
+	res := &api.JSONTxID{}
+	err := c.requester.SendRequest("importAVAX", &ImportArgs{
+		UserPass:    user,
+		To:          to,
+		SourceChain: sourceChain,
+	}, res)
+	return res.TxID, err
+}
+
+// ExportAVAX sends AVAX from this chain to the address specified by [to].
+// Returns the ID of the newly created atomic transaction
 func (c *Client) ExportAVAX(
 	user api.UserPass,
 	amount uint64,
@@ -399,22 +415,12 @@ func (c *Client) ExportAVAX(
 		Amount: cjson.Uint64(amount),
 		To:     to,
 	}, res)
-	if err != nil {
-		return ids.Empty, err
-	}
-	return res.TxID, nil
-}
-
-func (c *Client) Import(user api.UserPass, to, sourceChain string) (ids.ID, error) {
-	res := &api.JSONTxID{}
-	err := c.requester.SendRequest("importAVAX", &ImportArgs{
-		UserPass:    user,
-		To:          to,
-		SourceChain: sourceChain,
-	}, res)
 	return res.TxID, err
 }
 
+// Export sends an asset from this chain to the P/C-Chain.
+// After this tx is accepted, the AVAX must be imported to the P/C-chain with an importTx.
+// Returns the ID of the newly created atomic transaction
 func (c *Client) Export(
 	user api.UserPass,
 	amount uint64,
@@ -436,6 +442,5 @@ func (c *Client) Export(
 		},
 		AssetID: assetID,
 	}, res)
-
 	return res.TxID, err
 }
