@@ -122,13 +122,13 @@ func (c *Client) GetAllBalances(addr string) (*GetAllBalancesReply, error) {
 // CreateAsset creates a new asset and returns its assetID
 func (c *Client) CreateAsset(
 	user api.UserPass,
+	from []string,
+	changeAddr,
 	name,
 	symbol string,
 	denomination byte,
 	holders []*Holder,
 	minters []Owners,
-	from []string,
-	changeAddr string,
 ) (ids.ID, error) {
 	res := &FormattedAssetID{}
 	err := c.requester.SendRequest("createAsset", &CreateAssetArgs{
@@ -149,12 +149,12 @@ func (c *Client) CreateAsset(
 // CreateFixedCapAsset creates a new fixed cap asset and returns its assetID
 func (c *Client) CreateFixedCapAsset(
 	user api.UserPass,
+	from []string,
+	changeAddr,
 	name,
 	symbol string,
 	denomination byte,
 	holders []*Holder,
-	from []string,
-	changeAddr string,
 ) (ids.ID, error) {
 	res := &FormattedAssetID{}
 	err := c.requester.SendRequest("createFixedCapAsset", &CreateAssetArgs{
@@ -174,12 +174,12 @@ func (c *Client) CreateFixedCapAsset(
 // CreateVariableCapAsset creates a new variable cap asset and returns its assetID
 func (c *Client) CreateVariableCapAsset(
 	user api.UserPass,
+	from []string,
+	changeAddr,
 	name,
 	symbol string,
 	denomination byte,
 	minters []Owners,
-	from []string,
-	changeAddr string,
 ) (ids.ID, error) {
 	res := &FormattedAssetID{}
 	err := c.requester.SendRequest("createVariableCapAsset", &CreateAssetArgs{
@@ -199,11 +199,11 @@ func (c *Client) CreateVariableCapAsset(
 // CreateNFTAsset creates a new NFT asset and returns its assetID
 func (c *Client) CreateNFTAsset(
 	user api.UserPass,
+	from []string,
+	changeAddr,
 	name,
 	symbol string,
 	minters []Owners,
-	from []string,
-	changeAddr string,
 ) (ids.ID, error) {
 	res := &FormattedAssetID{}
 	err := c.requester.SendRequest("createNFTAsset", &CreateNFTAssetArgs{
@@ -256,12 +256,12 @@ func (c *Client) ImportKey(user api.UserPass, privateKey string) (string, error)
 // Send [amount] of [assetID] to address [to]
 func (c *Client) Send(
 	user api.UserPass,
+	from []string,
+	changeAddr string,
 	amount uint64,
 	assetID,
 	to,
 	memo string,
-	from []string,
-	changeAddr string,
 ) (ids.ID, error) {
 	res := &api.JSONTxID{}
 	err := c.requester.SendRequest("send", &SendArgs{
@@ -283,13 +283,13 @@ func (c *Client) Send(
 // SendMultiple sends a transaction from [user] funding all [outputs]
 func (c *Client) SendMultiple(
 	user api.UserPass,
-	outputs []SendOutput,
-	memo string,
 	from []string,
 	changeAddr string,
+	outputs []SendOutput,
+	memo string,
 ) (ids.ID, error) {
 	res := &api.JSONTxID{}
-	err := c.requester.SendRequest("send", &SendMultipleArgs{
+	err := c.requester.SendRequest("sendMultiple", &SendMultipleArgs{
 		JSONSpendHeader: api.JSONSpendHeader{
 			UserPass:       user,
 			JSONFromAddrs:  api.JSONFromAddrs{From: from},
@@ -304,11 +304,11 @@ func (c *Client) SendMultiple(
 // Mint [amount] of [assetID] to be owned by [to]
 func (c *Client) Mint(
 	user api.UserPass,
+	from []string,
+	changeAddr string,
 	amount uint64,
 	assetID,
 	to string,
-	from []string,
-	changeAddr string,
 ) (ids.ID, error) {
 	res := &api.JSONTxID{}
 	err := c.requester.SendRequest("mint", &MintArgs{
@@ -327,11 +327,11 @@ func (c *Client) Mint(
 // SendNFT sends an NFT and returns the ID of the newly created transaction
 func (c *Client) SendNFT(
 	user api.UserPass,
+	from []string,
+	changeAddr string,
 	assetID string,
 	groupID uint32,
 	to string,
-	from []string,
-	changeAddr string,
 ) (ids.ID, error) {
 	res := &api.JSONTxID{}
 	err := c.requester.SendRequest("sendNFT", &SendNFTArgs{
@@ -350,11 +350,11 @@ func (c *Client) SendNFT(
 // MintNFT issues a MintNFT transaction and returns the ID of the newly created transaction
 func (c *Client) MintNFT(
 	user api.UserPass,
+	from []string,
+	changeAddr string,
 	assetID string,
 	payload []byte,
 	to string,
-	from []string,
-	changeAddr string,
 ) (ids.ID, error) {
 	res := &api.JSONTxID{}
 	err := c.requester.SendRequest("mintNFT", &MintNFTArgs{
@@ -388,7 +388,7 @@ func (c *Client) ImportAVAX(user api.UserPass, to, sourceChain string) (ids.ID, 
 // returns the ID of the newly created transaction
 func (c *Client) Import(user api.UserPass, to, sourceChain string) (ids.ID, error) {
 	res := &api.JSONTxID{}
-	err := c.requester.SendRequest("importAVAX", &ImportArgs{
+	err := c.requester.SendRequest("import", &ImportArgs{
 		UserPass:    user,
 		To:          to,
 		SourceChain: sourceChain,
@@ -400,10 +400,10 @@ func (c *Client) Import(user api.UserPass, to, sourceChain string) (ids.ID, erro
 // Returns the ID of the newly created atomic transaction
 func (c *Client) ExportAVAX(
 	user api.UserPass,
-	amount uint64,
-	to string,
 	from []string,
 	changeAddr string,
+	amount uint64,
+	to string,
 ) (ids.ID, error) {
 	res := &api.JSONTxID{}
 	err := c.requester.SendRequest("exportAVAX", &ExportAVAXArgs{
@@ -423,14 +423,14 @@ func (c *Client) ExportAVAX(
 // Returns the ID of the newly created atomic transaction
 func (c *Client) Export(
 	user api.UserPass,
+	from []string,
+	changeAddr string,
 	amount uint64,
 	to string,
 	assetID string,
-	from []string,
-	changeAddr string,
 ) (ids.ID, error) {
 	res := &api.JSONTxID{}
-	err := c.requester.SendRequest("exportAVAX", &ExportArgs{
+	err := c.requester.SendRequest("export", &ExportArgs{
 		ExportAVAXArgs: ExportAVAXArgs{
 			JSONSpendHeader: api.JSONSpendHeader{
 				UserPass:       user,

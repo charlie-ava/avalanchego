@@ -137,22 +137,32 @@ func (c *Client) GetPendingValidators(subnetID ids.ID) ([]interface{}, []interfa
 // GetCurrentSupply returns an upper bound on the supply of AVAX in the system
 func (c *Client) GetCurrentSupply() (uint64, error) {
 	res := &GetCurrentSupplyReply{}
-	err := c.requester.SendRequest("getPendingValidators", struct{}{}, res)
+	err := c.requester.SendRequest("getCurrentSupply", struct{}{}, res)
 	return uint64(res.Supply), err
 }
 
 // SampleValidators returns the nodeIDs of a sample of [sampleSize] validators from the current validator set for subnet with ID [subnetID]
-func (c *Client) SampleValidators(subnetID ids.ID, sampleSize uint16) (*SampleValidatorsReply, error) {
+func (c *Client) SampleValidators(subnetID ids.ID, sampleSize uint16) ([]string, error) {
 	res := &SampleValidatorsReply{}
 	err := c.requester.SendRequest("sampleValidators", &SampleValidatorsArgs{
 		SubnetID: subnetID,
 		Size:     cjson.Uint16(sampleSize),
 	}, res)
-	return res, err
+	return res.Validators, err
 }
 
 // AddValidator issues a transaction to add a validator to the primary network and returns the txID
-func (c *Client) AddValidator(user api.UserPass, rewardAddress, nodeID string, stakeAmount, startTime, endTime uint64, delegationFeeRate float32) (ids.ID, error) {
+func (c *Client) AddValidator(
+	user api.UserPass,
+	from []string,
+	changeAddr string,
+	rewardAddress,
+	nodeID string,
+	stakeAmount,
+	startTime,
+	endTime uint64,
+	delegationFeeRate float32,
+) (ids.ID, error) {
 	res := &api.JSONTxID{}
 	jsonStakeAmount := cjson.Uint64(stakeAmount)
 	err := c.requester.SendRequest("addValidator", &AddValidatorArgs{
@@ -174,13 +184,13 @@ func (c *Client) AddValidator(user api.UserPass, rewardAddress, nodeID string, s
 // AddDelegator issues a transaction to add a delegator to the primary network and returns the txID
 func (c *Client) AddDelegator(
 	user api.UserPass,
+	from []string,
+	changeAddr string,
 	rewardAddress,
 	nodeID string,
 	stakeAmount,
 	startTime,
 	endTime uint64,
-	from []string,
-	changeAddr string,
 ) (ids.ID, error) {
 	res := &api.JSONTxID{}
 	jsonStakeAmount := cjson.Uint64(stakeAmount)
@@ -203,14 +213,13 @@ func (c *Client) AddDelegator(
 // AddSubnetValidator issues a transaction to add validator [nodeID] to subnet with ID [subnetID] and returns the txID
 func (c *Client) AddSubnetValidator(
 	user api.UserPass,
-	destination,
+	from []string,
+	changeAddr string,
+	subnetID,
 	nodeID string,
 	stakeAmount,
 	startTime,
 	endTime uint64,
-	subnetID string,
-	from []string,
-	changeAddr string,
 ) (ids.ID, error) {
 	res := &api.JSONTxID{}
 	jsonStakeAmount := cjson.Uint64(stakeAmount)
@@ -234,9 +243,10 @@ func (c *Client) AddSubnetValidator(
 // CreateSubnet issues a transaction to create [subnet] and returns the txID
 func (c *Client) CreateSubnet(
 	user api.UserPass,
-	subnet APISubnet,
 	from []string,
 	changeAddr string,
+	controlKeys []string,
+	threshold uint32,
 ) (ids.ID, error) {
 	res := &api.JSONTxID{}
 	err := c.requester.SendRequest("createSubnet", &CreateSubnetArgs{
@@ -245,18 +255,21 @@ func (c *Client) CreateSubnet(
 			JSONFromAddrs:  api.JSONFromAddrs{From: from},
 			JSONChangeAddr: api.JSONChangeAddr{ChangeAddr: changeAddr},
 		},
-		APISubnet: subnet,
+		APISubnet: APISubnet{
+			ControlKeys: controlKeys,
+			Threshold:   cjson.Uint32(threshold),
+		},
 	}, res)
 	return res.TxID, err
 }
 
 // ExportAVAX issues an ExportAVAX transaction and returns the txID
 func (c *Client) ExportAVAX(
+	from []string,
+	changeAddr string,
 	user api.UserPass,
 	to string,
 	amount uint64,
-	from []string,
-	changeAddr string,
 ) (ids.ID, error) {
 	res := &api.JSONTxID{}
 	err := c.requester.SendRequest("exportAVAX", &ExportAVAXArgs{
@@ -274,10 +287,10 @@ func (c *Client) ExportAVAX(
 // ImportAVAX issues an ImportAVAX transaction and returns the txID
 func (c *Client) ImportAVAX(
 	user api.UserPass,
+	from []string,
+	changeAddr,
 	to,
 	sourceChain string,
-	from []string,
-	changeAddr string,
 ) (ids.ID, error) {
 	res := &api.JSONTxID{}
 	err := c.requester.SendRequest("importAVAX", &ImportAVAXArgs{
@@ -295,13 +308,13 @@ func (c *Client) ImportAVAX(
 // CreateBlockchain issues a CreateBlockchain transaction and returns the txID
 func (c *Client) CreateBlockchain(
 	user api.UserPass,
+	from []string,
+	changeAddr string,
 	subnetID ids.ID,
 	vmID string,
 	fxIDs []string,
 	name string,
 	genesisData []byte,
-	from []string,
-	changeAddr string,
 ) (ids.ID, error) {
 	res := &api.JSONTxID{}
 	err := c.requester.SendRequest("createBlockchain", &CreateBlockchainArgs{
@@ -414,7 +427,7 @@ func (c *Client) GetMinStake() (uint64, uint64, error) {
 // node during the time period.
 func (c *Client) GetMaxStakeAmount(subnetID ids.ID, nodeID string, startTime, endTime uint64) (uint64, error) {
 	res := new(GetMaxStakeAmountReply)
-	err := c.requester.SendRequest("getMinStake", &GetMaxStakeAmountArgs{
+	err := c.requester.SendRequest("getMaxStakeAmount", &GetMaxStakeAmountArgs{
 		SubnetID:  subnetID,
 		NodeID:    nodeID,
 		StartTime: cjson.Uint64(startTime),
